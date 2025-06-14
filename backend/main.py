@@ -7,6 +7,7 @@ configurations using the mathematical optimization algorithms.
 
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import Session, select
 from typing import Dict, Tuple
 from pydantic import BaseModel, Field
@@ -31,6 +32,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 
 class ContainerDimensions(BaseModel):
@@ -62,20 +65,23 @@ def get_session():
         yield session
 
 
-@app.get("/healthz", status_code=200)
+from fastapi import APIRouter
+api_router = APIRouter(prefix="/api")
+
+@api_router.get("/healthz", status_code=200)
 async def health_check():
     """Health check endpoint."""
     return {"status": "OK", "message": "Container Loading Optimizer API is running"}
 
 
-@app.get("/items", response_model=list[ItemCatalog])
+@api_router.get("/items", response_model=list[ItemCatalog])
 async def list_items(session: Session = Depends(get_session)):
     """List all available items in the catalog."""
     items = session.exec(select(ItemCatalog)).all()
     return items
 
 
-@app.get("/items/{sku}", response_model=ItemCatalog)
+@api_router.get("/items/{sku}", response_model=ItemCatalog)
 async def get_item(sku: str, session: Session = Depends(get_session)):
     """Get item details by SKU."""
     item = session.exec(select(ItemCatalog).where(ItemCatalog.sku == sku)).first()
@@ -84,7 +90,7 @@ async def get_item(sku: str, session: Session = Depends(get_session)):
     return item
 
 
-@app.post("/optimize", response_model=OptimizeResponse)
+@api_router.post("/optimize", response_model=OptimizeResponse)
 async def optimize_container_loading(
     request: OptimizeRequest,
     session: Session = Depends(get_session)
@@ -144,6 +150,12 @@ async def optimize_container_loading(
         else:
             raise HTTPException(status_code=400, detail=str(e))
 
+app.include_router(api_router)
+
+
+
+
+app.mount("/", StaticFiles(directory="static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn
