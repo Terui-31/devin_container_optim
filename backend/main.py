@@ -12,9 +12,9 @@ from sqlmodel import Session, select
 from typing import Dict, Tuple
 from pydantic import BaseModel, Field
 
-from database import engine
-from models import ItemCatalog
-from optimizer import maximize_load
+from .database import engine, create_db_and_tables
+from .models import ItemCatalog
+from .optimizer import maximize_load
 
 
 app = FastAPI(
@@ -32,6 +32,44 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database and seed data on startup."""
+    create_db_and_tables()
+    
+    with Session(engine) as session:
+        existing_items = session.exec(select(ItemCatalog)).first()
+        if not existing_items:
+            sample_items = [
+                ItemCatalog(
+                    sku="SKU001",
+                    name="Small Box A",
+                    length=10.0,
+                    width=8.0,
+                    height=6.0,
+                    weight=0.5
+                ),
+                ItemCatalog(
+                    sku="SKU002",
+                    name="Medium Box B",
+                    length=20.0,
+                    width=15.0,
+                    height=12.0,
+                    weight=1.2
+                ),
+                ItemCatalog(
+                    sku="SKU003",
+                    name="Small Box C",
+                    length=15.0,
+                    width=10.0,
+                    height=8.0,
+                    weight=0.8
+                )
+            ]
+            for item in sample_items:
+                session.add(item)
+            session.commit()
 
 
 
@@ -155,7 +193,7 @@ app.include_router(api_router)
 
 
 
-app.mount("/", StaticFiles(directory="static", html=True), name="static")
+app.mount("/", StaticFiles(directory="backend/static", html=True), name="static")
 
 if __name__ == "__main__":
     import uvicorn

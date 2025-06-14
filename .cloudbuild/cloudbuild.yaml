@@ -1,0 +1,35 @@
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', '$LOCATION-docker.pkg.dev/$PROJECT_ID/cont-load/app:$COMMIT_SHA',
+      '.'
+    ]
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push',
+      '$LOCATION-docker.pkg.dev/$PROJECT_ID/cont-load/app:$COMMIT_SHA'
+    ]
+
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: [
+      'run', 'deploy', 'cont-load-api',
+      '--image', '$LOCATION-docker.pkg.dev/$PROJECT_ID/cont-load/app:$COMMIT_SHA',
+      '--region', '$REGION',
+      '--platform', 'managed',
+      '--allow-unauthenticated',
+      '--port', '8080',
+      '--memory', '1Gi',
+      '--cpu', '1',
+      '--max-instances', '10',
+      '--set-env-vars', 'DATABASE_URL=sqlite:///app.db'
+    ]
+
+images:
+  - '$LOCATION-docker.pkg.dev/$PROJECT_ID/cont-load/app:$COMMIT_SHA'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: 'E2_HIGHCPU_8'
